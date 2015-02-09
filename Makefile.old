@@ -37,7 +37,7 @@ TARGET		= httpd
 MODULES		= driver user mqtt
 EXTRA_INCDIR	= include \
 		. \
-		library/heatshrink/ \
+		lib/heatshrink/ \
 		$(SDK_EXTRA_INCLUDES)
 		
 
@@ -49,6 +49,7 @@ LIBS		= c gcc hal phy pp net80211 wpa main lwip upgrade ssl
 CFLAGS		= -Os -ggdb -std=c99 -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
 		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
 		-Wno-address
+
 # (originalCFLAGS		= -Os -ggdb -std=c99 -Werror -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
 # 		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
 # 		-Wno-address

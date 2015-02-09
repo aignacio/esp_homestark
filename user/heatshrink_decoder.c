@@ -15,6 +15,6 @@
 #include "heatshrink_config_httpd.h"
 #define memset(x,y,z) os_memset(x,y,z)
 #define memcpy(x,y,z) os_memcpy(x,y,z)
-#include "../lib/heatshrink/heatshrink_decoder.c"
+#include "../library/heatshrink/heatshrink_decoder.c"
 
 #endif

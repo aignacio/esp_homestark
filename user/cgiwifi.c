@@ -147,7 +147,7 @@ static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 	if (x==STATION_GOT_IP) {
 		//Go to STA mode. This needs a reset, so do that.
 		os_printf("Got IP. Going into STA mode..\n");
-		wifi_set_opmode(1);
+		wifi_set_opmode(0x01);
 		system_restart();
 	} else {
 		os_printf("Connect fail. Not going into STA-only mode.\n");
