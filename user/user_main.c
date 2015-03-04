@@ -1,74 +1,53 @@
-#include "espmissingincludes.h"
+/* main.c -- MQTT client example
+*
+* Copyright (c) 2014-2015, Tuan PM <tuanpm at live dot com>
+* All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*
+* * Redistributions of source code must retain the above copyright notice,
+* this list of conditions and the following disclaimer.
+* * Redistributions in binary form must reproduce the above copyright
+* notice, this list of conditions and the following disclaimer in the
+* documentation and/or other materials provided with the distribution.
+* * Neither the name of Redis nor the names of its contributors may be used
+* to endorse or promote products derived from this software without
+* specific prior written permission.
+*
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+* AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+* ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+* LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+* SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+* CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+* ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+* POSSIBILITY OF SUCH DAMAGE.
+*/
 #include "ets_sys.h"
-#include "osapi.h"
-#include "httpd.h"
-#include "io.h"
-#include "httpdespfs.h"
-#include "cgi.h"
-#include "cgiwifi.h"
-#include "stdout.h"
-#include "auth.h"
-#include "os_type.h"
-#include "gpio.h"
-#include "espconn.h"
 #include "driver/uart.h"
-
-/*****************LIB of MQTT*****************/
+#include "osapi.h"
 #include "mqtt.h"
 #include "wifi.h"
 #include "config.h"
 #include "debug.h"
+#include "gpio.h"
 #include "user_interface.h"
 #include "mem.h"
-/*********************************************/
 
-#define WIFI_APSSID		"HomeStark"
-#define WIFI_APPASS		"password"
-
-LOCAL os_timer_t mqtt_timer;
-bool flag = 0;
 MQTT_Client mqttClient;
 
-//Function that tells the authentication system what users/passwords live on the system.
-//This is disabled in the default build; if you want to try it, enable the authBasic line in
-//the builtInUrls below.
-int myPassFn(HttpdConnData *connData, int no, char *user, int userLen, char *pass, int passLen) {
-	if (no==0) {
-		os_strcpy(user, "admin");
-		os_strcpy(pass, "s3cr3t");
-		return 1;
-//Add more users this way. Check against incrementing no for each user added.
-//	} else if (no==1) {
-//		os_strcpy(user, "user1");
-//		os_strcpy(pass, "something");
-//		return 1;
+void wifiConnectCb(uint8_t status)
+{
+	if(status == STATION_GOT_IP){
+		MQTT_Connect(&mqttClient);
+	} else {
+		MQTT_Disconnect(&mqttClient);
 	}
-	return 0;
 }
-
-
-/*
-This is the main url->function dispatching data struct.
-In short, it's a struct with various URLs plus their handlers. The handlers can
-be 'standard' CGI functions you wrote, or 'special' CGIs requiring an argument.
-They can also be auth-functions. An asterisk will match any url starting with
-everything before the asterisks; "*" matches everything. The list will be
-handled top-down, so make sure to put more specific rules above the more
-general ones. Authorization things (like authBasic) act as a 'barrier' and
-should be placed above the URLs they protect.
-*/
-HttpdBuiltInUrl builtInUrls[]={
-	{"/", cgiRedirect, "/wifi/wifi.tpl"},
-	{"/wifi", cgiRedirect, "/wifi/wifi.tpl"},
-	{"/wifi/", cgiRedirect, "/wifi/wifi.tpl"},
-	{"/wifi/wifiscan.cgi", cgiWiFiScan, NULL},
-	{"/wifi/wifi.tpl", cgiEspFsTemplate, tplWlan},
-	{"/wifi/connect.cgi", cgiWiFiConnect, NULL},
-	{"/wifi/setmode.cgi", cgiWifiSetMode, NULL},
-	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
-	{NULL, NULL, NULL}
-};
-
 void mqttConnectedCb(uint32_t *args)
 {
 	MQTT_Client* client = (MQTT_Client*)args;
@@ -113,73 +92,30 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
 	os_free(dataBuf);
 }
 
-LOCAL void ICACHE_FLASH_ATTR CheckForMQTT_cb(void *arg)
+void mqttStartConnection()
 {
-	if(flag)
-	{
-		gpio_output_set(BIT2, 0, BIT2, 0);
-		flag = 0;
-	}
-	else
-	{
-		gpio_output_set(0, BIT2, BIT2, 0);
-		flag = 1;
-	}
+	CFG_Load();
 
-	if(wifi_station_get_connect_status() == STATION_GOT_IP)
-	{
-		//CFG_Load();
-		// struct station_config config;
-		// int i = wifi_station_get_ap_info(&config);
+	MQTT_InitConnection(&mqttClient, sysCfg.mqtt_host, sysCfg.mqtt_port, sysCfg.security);
+	//MQTT_InitConnection(&mqttClient, "192.168.11.122", 1880, 0);
 
-		// os_sprintf(sysCfg.sta_ssid, "%s", config.ssid);
-		// os_sprintf(sysCfg.sta_pwd, "%s", config.password);
-		// sysCfg.sta_type = STA_TYPE;
+	MQTT_InitClient(&mqttClient, sysCfg.device_id, sysCfg.mqtt_user, sysCfg.mqtt_pass, sysCfg.mqtt_keepalive, 1);
+	//MQTT_InitClient(&mqttClient, "client_id", "user", "pass", 120, 1);
 
-		os_sprintf(sysCfg.device_id, MQTT_CLIENT_ID, system_get_chip_id());
-		os_sprintf(sysCfg.mqtt_host, "%s", MQTT_HOST);
-		sysCfg.mqtt_port = MQTT_PORT;
-		os_sprintf(sysCfg.mqtt_user, "%s", MQTT_USER);
-		os_sprintf(sysCfg.mqtt_pass, "%s", MQTT_PASS);
+	MQTT_InitLWT(&mqttClient, "/lwt", "offline", 0, 0);
+	MQTT_OnConnected(&mqttClient, mqttConnectedCb);
+	MQTT_OnDisconnected(&mqttClient, mqttDisconnectedCb);
+	MQTT_OnPublished(&mqttClient, mqttPublishedCb);
+	MQTT_OnData(&mqttClient, mqttDataCb);
 
-		MQTT_InitConnection(&mqttClient, sysCfg.mqtt_host, sysCfg.mqtt_port, sysCfg.security);
-		//MQTT_InitConnection(&mqttClient, "192.168.11.122", 1880, 0);
+	WIFI_Connect(sysCfg.sta_ssid, sysCfg.sta_pwd, wifiConnectCb);
 
-		MQTT_InitClient(&mqttClient, sysCfg.device_id, sysCfg.mqtt_user, sysCfg.mqtt_pass, sysCfg.mqtt_keepalive, 1);
-		//MQTT_InitClient(&mqttClient, "client_id", "user", "pass", 120, 1);
-
-		MQTT_InitLWT(&mqttClient, "/lwt", "offline", 0, 0);
-		MQTT_OnConnected(&mqttClient, mqttConnectedCb);
-		MQTT_OnDisconnected(&mqttClient, mqttDisconnectedCb);
-		MQTT_OnPublished(&mqttClient, mqttPublishedCb);
-		MQTT_OnData(&mqttClient, mqttDataCb);
-
-		//WIFI_Connect("Wi-fi Anderson", "wifi3102230", wifiConnectCb);
-		MQTT_Connect(&mqttClient);
-
-		INFO("\r\nMQTT System started ...\r\n");
-		os_timer_disarm(&mqtt_timer);
-	} 
+	INFO("\r\nSystem MQTT started ...\r\n");
 }
 
-
-// void ICACHE_FLASH_ATTR at_recvTask()
-// {
-// 		//Called from UART.
-// }
-
-
-//Main routine. Initialize stdout, the I/O and the webserver and we're done.
-void user_init(void) 
+void tcpMobileCfg()
 {
-	uart_init(BIT_RATE_115200,BIT_RATE_115200);//stdoutInit();
-	os_delay_us(1000000);
-	ioInit();
-
-	//system_restore();	
-
 	/****** Print Some inf. about ESP ******/
-
 	os_printf("\n\n");
 	os_printf("\nPrinting AP Settings:\n");
 	struct softap_config cfgESP;
@@ -191,19 +127,15 @@ void user_init(void)
 	os_printf("\nSSID Hidden:%d",cfgESP.ssid_hidden);
 	os_printf("\nMax Connections:%d",cfgESP.max_connection);
 	os_printf("\n\n");
+	wifi_set_opmode(0x3);
+	while(1);
+}
 
-	/****** Change SSID ******/
-	// memset(cfgESP.ssid, 0, 32); //Clean variable
-	// strcpy(cfgESP.ssid, WIFI_APSSID);
-	// wifi_softap_set_config(&cfgESP);
+void user_init(void)
+{
+	uart_init(BIT_RATE_115200, BIT_RATE_115200);
+	os_delay_us(1000000);
 
-	/****** Init WS ******/
-	httpdInit(builtInUrls, 80);
-	os_printf("\nWebServer=Ready\n");
-
-	/****** MQTT polling to connect ******/
-	os_timer_disarm(&mqtt_timer); 
-	os_timer_setfn(&mqtt_timer, (os_timer_func_t *)CheckForMQTT_cb, (void *)0); 
-	os_timer_arm(&mqtt_timer, 500, 1);
-	os_printf("\nMQTT timer=Started\n");
+	tcpMobileCfg();
+	//mqttStartConnection();
 }
