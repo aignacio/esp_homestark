@@ -65,7 +65,7 @@ else
 # We are under other system, may be Linux. Assume using gcc.
 	# Can we use -fdata-sections?
 	ESPPORT ?= /dev/ttyUSB0
-	SDK_BASE	?= /esptools/esp-open-sdk/sdk
+	SDK_BASE	?= /opt/Espressif/ESP8266_SDK
 
 	CCFLAGS += -Os -ffunction-sections -fno-jump-tables
 	AR = xtensa-lx106-elf-ar
@@ -199,7 +199,7 @@ firmware:
 flash: $(FW_FILE_1)  $(FW_FILE_2)
 	$(ESPTOOL) -p $(ESPPORT) write_flash $(FW_1) $(FW_FILE_1) $(FW_2) $(FW_FILE_2)
 
-test: flash
+test: 
 	screen $(ESPPORT) 115200
 
 rebuild: clean all

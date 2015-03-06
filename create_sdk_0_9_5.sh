@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 
-sudo apt-get update
+#sudo apt-get update
 sudo apt-get install -y git autoconf build-essential gperf bison flex texinfo libtool libncurses5-dev wget gawk libc6-dev python-serial libexpat-dev unzip
 
+sudo rm -rf /opt/Espressif
 sudo mkdir -p /opt/Espressif
 sudo chown -R $USER /opt/Espressif
 
-cd /opt/Espressif
-
 #Install crosstool-NG (toolchain)
 cd /opt/Espressif
-git clone -b lx106 git://github.com/jcmvbkbc/crosstool-NG.git 
+git clone -b lx106 http://github.com/jcmvbkbc/crosstool-NG.git 
 cd crosstool-NG
 ./bootstrap && ./configure --prefix=`pwd` && make && make install
 ./ct-ng xtensa-lx106-elf
@@ -21,11 +20,11 @@ echo "export PATH=$PWD/builds/xtensa-lx106-elf/bin:\$PATH" >> ~/.bashrc
 
 #Setup SDK
 cd /opt/Espressif
-wget -O esp_iot_sdk_v0.9.3_14_11_21.zip https://github.com/esp8266/esp8266-wiki/raw/master/sdk/esp_iot_sdk_v0.9.3_14_11_21.zip
-wget -O esp_iot_sdk_v0.9.3_14_11_21_patch1.zip https://github.com/esp8266/esp8266-wiki/raw/master/sdk/esp_iot_sdk_v0.9.3_14_11_21_patch1.zip
-unzip esp_iot_sdk_v0.9.3_14_11_21.zip
-unzip -o esp_iot_sdk_v0.9.3_14_11_21_patch1.zip
-ln -s esp_iot_sdk_v0.9.3 ESP8266_SDK
+wget -O esp_esp_iot_sdk_v0.9.5_15_01_23.zip https://github.com/esp8266/esp8266-wiki/raw/master/sdk/esp_iot_sdk_v0.9.5_15_01_23.zip
+wget -O esp_iot_sdk_v0.9.5_15_01_23_patch1.zip https://github.com/esp8266/esp8266-wiki/raw/master/sdk/esp_iot_sdk_v0.9.5_15_01_23_patch1.zip
+unzip esp_esp_iot_sdk_v0.9.5_15_01_23.zip
+unzip -o esp_iot_sdk_v0.9.5_15_01_23_patch1.zip
+ln -s esp_iot_sdk_v0.9.5 ESP8266_SDK
 
 #Add missing libs
 cd /opt/Espressif/ESP8266_SDK

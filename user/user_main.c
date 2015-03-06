@@ -38,6 +38,8 @@
 #include "user_interface.h"
 #include "mem.h"
 
+#define WIFI_APPASSWORD	"3102230u"
+#define WIFI_APSSID		"Homestark"
 MQTT_Client mqttClient;
 
 void wifiConnectCb(uint8_t status)
@@ -127,8 +129,60 @@ void tcpMobileCfg()
 	os_printf("\nSSID Hidden:%d",cfgESP.ssid_hidden);
 	os_printf("\nMax Connections:%d",cfgESP.max_connection);
 	os_printf("\n\n");
-	wifi_set_opmode(0x3);
+	//wifi_set_opmode(0x3);
 	while(1);
+}
+
+void configureAP()
+{
+	static char ssid[33];
+	static char password[33];
+	static uint8_t macaddr[6];
+	
+	struct softap_config apConfig;
+	wifi_set_opmode(0x3);
+	switch(wifi_get_opmode())
+	{
+		case STATION_MODE:
+			INFO("Modo de operação: Station");
+		break;
+		case SOFTAP_MODE:
+			INFO("Modo de operação: Access Point Mode");
+
+		break;
+		case STATIONAP_MODE:
+			INFO("Modo de operação: Access Point Mode + Station");
+
+		break;
+	}
+
+	os_memset(apConfig.password, 0, sizeof(apConfig.password));
+	os_sprintf(password, "%s", WIFI_APPASSWORD);
+	os_memcpy(apConfig.password, password, os_strlen(password));
+
+	os_memset(apConfig.ssid, 0, sizeof(apConfig.ssid));
+	os_sprintf(ssid, "%s", WIFI_APSSID);
+	os_memcpy(apConfig.ssid, ssid, os_strlen(ssid));
+
+	apConfig.authmode = AUTH_WEP;
+	//apConfig.authmode = AUTH_WPA_WPA2_PSK;
+	//apConfig.authmode = AUTH_OPEN;
+	apConfig.channel = 7;
+	apConfig.max_connection = 10;
+	apConfig.ssid_hidden = 0;
+	wifi_softap_set_config(&apConfig);
+
+	wifi_softap_dhcps_start();
+	switch(wifi_softap_dhcps_status())
+	{
+		case DHCP_STOPPED:
+			INFO("\nDHCP Server parou!\n");
+		break;
+		case DHCP_STARTED:
+			INFO("\nDHCP Server foi iniciado!\n");
+		break;
+	}
+
 }
 
 void user_init(void)
@@ -136,6 +190,7 @@ void user_init(void)
 	uart_init(BIT_RATE_115200, BIT_RATE_115200);
 	os_delay_us(1000000);
 
+	configureAP();
 	tcpMobileCfg();
 	//mqttStartConnection();
 }
