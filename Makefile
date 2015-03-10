@@ -197,7 +197,7 @@ firmware:
 	$(Q) mkdir -p $@
 
 flash: $(FW_FILE_1)  $(FW_FILE_2)
-	$(ESPTOOL) -p $(ESPPORT) write_flash $(FW_1) $(FW_FILE_1) $(FW_2) $(FW_FILE_2)
+	$(ESPTOOL) -p $(ESPPORT) write_flash $(FW_1) $(FW_FILE_1) 0x3C000 /opt/Espressif/ESP8266_SDK/bin/blank.bin $(FW_2) $(FW_FILE_2)
 
 test: 
 	screen $(ESPPORT) 115200
