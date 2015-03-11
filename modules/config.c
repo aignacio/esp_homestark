@@ -72,16 +72,16 @@ CFG_Load()
 {
 
 	INFO("\r\nload ...\r\n");
-	spi_flash_read((CFG_LOCATION + 3) * SPI_FLASH_SEC_SIZE,
-				   (uint32 *)&saveFlag, sizeof(SAVE_FLAG));
-	if (saveFlag.flag == 0) {
-		spi_flash_read((CFG_LOCATION + 0) * SPI_FLASH_SEC_SIZE,
-					   (uint32 *)&sysCfg, sizeof(SYSCFG));
-	} else {
-		spi_flash_read((CFG_LOCATION + 1) * SPI_FLASH_SEC_SIZE,
-					   (uint32 *)&sysCfg, sizeof(SYSCFG));
-	}
-	if(sysCfg.cfg_holder != CFG_HOLDER){
+	// spi_flash_read((CFG_LOCATION + 3) * SPI_FLASH_SEC_SIZE,
+	// 			   (uint32 *)&saveFlag, sizeof(SAVE_FLAG));
+	// if (saveFlag.flag == 0) {
+	// 	spi_flash_read((CFG_LOCATION + 0) * SPI_FLASH_SEC_SIZE,
+	// 				   (uint32 *)&sysCfg, sizeof(SYSCFG));
+	// } else {
+	// 	spi_flash_read((CFG_LOCATION + 1) * SPI_FLASH_SEC_SIZE,
+	// 				   (uint32 *)&sysCfg, sizeof(SYSCFG));
+	// }
+	// if(sysCfg.cfg_holder != CFG_HOLDER){
 		os_memset(&sysCfg, 0x00, sizeof sysCfg);
 
 
@@ -103,7 +103,7 @@ CFG_Load()
 
 		INFO(" default configuration\r\n");
 
-		CFG_Save();
-	}
+		// CFG_Save();
+	// }
 
 }

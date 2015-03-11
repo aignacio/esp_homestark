@@ -1,3 +1,4 @@
+# tnx to mamalala
 # Changelog
 # Changed the variables to include the header file directory
 # Added global var for the XTENSA tool root
@@ -8,128 +9,76 @@
 # Output directors to store intermediate compiled files
 # relative to the project directory
 BUILD_BASE	= build
-FW_BASE = firmware
-ESPTOOL = tools/esptool.py
+FW_BASE		= firmware
 
+# Base directory for the compiler. Needs a / at the end; if not set it'll use the tools that are in
+# the PATH.
 
-# name for the target project
-TARGET		= app
+# base directory of the ESP8266 SDK package, absolute
+SDK_BASE	?= /opt/Espressif/esp_iot_sdk_v0.9.5
+XTENSA_TOOLS_ROOT= /opt/Espressif/crosstool-NG/builds/xtensa-lx106-elf/bin/
 
-# linker script used for the above linkier step
-LD_SCRIPT	= eagle.app.v6.ld
+#Esptool.py path and port
+ESPTOOL		?= esptool
+FW_TOOL		?= /opt/Espressif/esptool-py/esptool.py
+ESPPORT		?= /dev/ttyUSB0
 
-# we create two different files for uploading into the flash
-# these are the names and options to generate them
 FW_1	= 0x00000
+FW_3	= 0x12000
 FW_2	= 0x40000
 
-FLAVOR ?= release
+#ESPDELAY indicates seconds to wait between flashing the two binary images
+ESPDELAY	?= 3
+ESPBAUD		?= 115200
 
-
-#############################################################
-# Select compile
-#
-ifeq ($(OS),Windows_NT)
-# WIN32
-# We are under windows.
-	ifeq ($(XTENSA_CORE),lx106)
-		# It is xcc
-		AR = xt-ar
-		CC = xt-xcc
-		LD = xt-xcc
-		NM = xt-nm
-		CPP = xt-cpp
-		OBJCOPY = xt-objcopy
-		#MAKE = xt-make
-		CCFLAGS += -Os --rename-section .text=.irom0.text --rename-section .literal=.irom0.literal
-	else 
-		# It is gcc, may be cygwin
-		# Can we use -fdata-sections?
-		CCFLAGS += -Os -ffunction-sections -fno-jump-tables
-		AR = xtensa-lx106-elf-ar
-		CC = xtensa-lx106-elf-gcc
-		LD = xtensa-lx106-elf-gcc
-		NM = xtensa-lx106-elf-nm
-		CPP = xtensa-lx106-elf-cpp
-		OBJCOPY = xtensa-lx106-elf-objcopy
-	endif
-	ESPPORT 	?= com1
-	SDK_BASE	?= c:/Espressif/ESP8266_SDK
-    ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
-# ->AMD64
-    endif
-    ifeq ($(PROCESSOR_ARCHITECTURE),x86)
-# ->IA32
-    endif
-else
-# We are under other system, may be Linux. Assume using gcc.
-	# Can we use -fdata-sections?
-	ESPPORT ?= /dev/ttyUSB0
-	SDK_BASE	?= /opt/Espressif/ESP8266_SDK
-
-	CCFLAGS += -Os -ffunction-sections -fno-jump-tables
-	AR = xtensa-lx106-elf-ar
-	CC = xtensa-lx106-elf-gcc
-	LD = xtensa-lx106-elf-gcc
-	NM = xtensa-lx106-elf-nm
-	CPP = xtensa-lx106-elf-cpp
-	OBJCOPY = xtensa-lx106-elf-objcopy
-    UNAME_S := $(shell uname -s)
-
-    ifeq ($(UNAME_S),Linux)
-# LINUX
-    endif
-    ifeq ($(UNAME_S),Darwin)
-# OSX
-    endif
-    UNAME_P := $(shell uname -p)
-    ifeq ($(UNAME_P),x86_64)
-# ->AMD64
-    endif
-    ifneq ($(filter %86,$(UNAME_P)),)
-# ->IA32
-    endif
-    ifneq ($(filter arm%,$(UNAME_P)),)
-# ->ARM
-    endif
-endif
-#############################################################
-
+# name for the target project
+TARGET		= httpd
 
 # which modules (subdirectories) of the project to include in compiling
-MODULES		= driver mqtt user modules
-EXTRA_INCDIR    = include $(SDK_BASE)/../include
+#MODULES		= driver user lwip/api lwip/app lwip/core lwip/core/ipv4 lwip/netif
+MODULES		= driver user mqtt modules
+EXTRA_INCDIR	= include \
+		. \
+		lib/heatshrink/
 
 # libraries used in this project, mainly provided by the SDK
-LIBS		= c gcc hal phy pp net80211 lwip wpa main ssl
+LIBS		= c gcc hal phy pp net80211 wpa main lwip  ssl
 
 # compiler flags using during compilation of source files
-CFLAGS		= -Os -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH
+CFLAGS		= -Os -ggdb -std=c99 -Wpointer-arith -Wundef -Wall -Wl,-EL -fno-inline-functions \
+		-nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH \
+		-Wno-address -w
+
+#-w FLAG : DISABLE ALL FLAGS
 
 # linker flags used to generate the main object file
 LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
-ifeq ($(FLAVOR),debug)
-    CFLAGS += -g -O0
-    LDFLAGS += -g -O0
-endif
-
-ifeq ($(FLAVOR),release)
-    CFLAGS += -g -O2
-    LDFLAGS += -g -O2
-endif
-
-
+# linker script used for the above linkier step
+LD_SCRIPT	= eagle.app.v6.ld
 
 # various paths from the SDK used in this project
 SDK_LIBDIR	= lib
 SDK_LDDIR	= ld
 SDK_INCDIR	= include include/json
 
+# we create two different files for uploading into the flash
+# these are the names and options to generate them
+FW_FILE_1	= 0x00000
+FW_FILE_1_ARGS	= -bo $@ -bs .text -bs .data -bs .rodata -bc -ec
+FW_FILE_2	= 0x40000
+FW_FILE_2_ARGS	= -es .irom0.text $@ -ec
+
+# select which tools to use as compiler, librarian and linker
+CC		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-gcc
+AR		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-ar
+LD		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-gcc
+
+
+
 ####
 #### no user configurable options below here
 ####
-FW_TOOL		?= $(ESPTOOL)
 SRC_DIR		:= $(MODULES)
 BUILD_DIR	:= $(addprefix $(BUILD_BASE)/,$(MODULES))
 
@@ -148,8 +97,8 @@ INCDIR	:= $(addprefix -I,$(SRC_DIR))
 EXTRA_INCDIR	:= $(addprefix -I,$(EXTRA_INCDIR))
 MODULE_INCDIR	:= $(addsuffix /include,$(INCDIR))
 
-FW_FILE_1	:= $(addprefix $(FW_BASE)/,$(FW_1).bin)
-FW_FILE_2	:= $(addprefix $(FW_BASE)/,$(FW_2).bin)
+FW_FILE_1	:= $(addprefix $(FW_BASE)/,$(FW_FILE_1).bin)
+FW_FILE_2	:= $(addprefix $(FW_BASE)/,$(FW_FILE_2).bin)
 
 V ?= $(VERBOSE)
 ifeq ("$(V)","1")
@@ -172,13 +121,13 @@ endef
 
 all: checkdirs $(TARGET_OUT) $(FW_FILE_1) $(FW_FILE_2)
 
-$(FW_FILE_1): $(TARGET_OUT)
+$(FW_FILE_1): $(TARGET_OUT) firmware
 	$(vecho) "FW $@"
-	$(ESPTOOL) elf2image $< -o $(FW_BASE)/
-	
-$(FW_FILE_2): $(TARGET_OUT)
+	$(Q) $(ESPTOOL) -eo $(TARGET_OUT) $(FW_FILE_1_ARGS)
+
+$(FW_FILE_2): $(TARGET_OUT) firmware
 	$(vecho) "FW $@"
-	$(ESPTOOL) elf2image $< -o $(FW_BASE)/
+	$(Q) $(ESPTOOL) -eo $(TARGET_OUT) $(FW_FILE_2_ARGS)
 
 $(TARGET_OUT): $(APP_AR)
 	$(vecho) "LD $@"
@@ -196,19 +145,31 @@ $(BUILD_DIR):
 firmware:
 	$(Q) mkdir -p $@
 
-flash: $(FW_FILE_1)  $(FW_FILE_2)
-	$(ESPTOOL) -p $(ESPPORT) write_flash $(FW_1) $(FW_FILE_1) 0x3C000 /opt/Espressif/ESP8266_SDK/bin/blank.bin $(FW_2) $(FW_FILE_2)
+flash: $(FW_FILE_1) $(FW_FILE_2) webpages.espfs
+	# $(Q) $(ESPTOOL) -cp $(ESPPORT) -cb $(ESPBAUD) -ca 0x00000 -cf firmware/0x00000.bin -v
+	# $(Q) [ $(ESPDELAY) -ne 0 ] && echo "Please put the ESP in bootloader mode..." || true
+	# $(Q) sleep $(ESPDELAY) || true
+	# $(Q) $(ESPTOOL) -cp $(ESPPORT) -cb $(ESPBAUD) -ca 0x40000 -cf firmware/0x40000.bin -v
+	python $(FW_TOOL) -p $(ESPPORT) write_flash $(FW_1) $(FW_FILE_1) 0x3C000 /opt/Espressif/ESP8266_SDK/bin/blank.bin $(FW_2) $(FW_FILE_2) $(FW_3) webpages.espfs   
 
+
+webpages.espfs: html/ html/wifi/ mkespfsimage/mkespfsimage
+	cd html; find | ../mkespfsimage/mkespfsimage > ../webpages.espfs; cd ..
+
+mkespfsimage/mkespfsimage: mkespfsimage/
+	make -C mkespfsimage
+
+htmlflash: webpages.espfs
+	if [ $$(stat -c '%s' webpages.espfs) -gt $$(( 0x2E000 )) ]; then echo "webpages.espfs too big!"; false; fi
+	$(ESPTOOL) -cp $(ESPPORT) -cb $(ESPBAUD) -ca 0x12000 -cf webpages.espfs -v
 test: 
 	screen $(ESPPORT) 115200
-
-rebuild: clean all
-
 clean:
 	$(Q) rm -f $(APP_AR)
 	$(Q) rm -f $(TARGET_OUT)
-	$(Q) rm -rf $(BUILD_DIR)
-	$(Q) rm -rf $(BUILD_BASE)
+	$(Q) find $(BUILD_BASE) -type f | xargs rm -f
+
+
 	$(Q) rm -f $(FW_FILE_1)
 	$(Q) rm -f $(FW_FILE_2)
 	$(Q) rm -rf $(FW_BASE)
