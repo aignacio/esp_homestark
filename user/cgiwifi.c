@@ -20,7 +20,7 @@ Cgi/template routines for the /wifi url.
 #include "cgi.h"
 #include "io.h"
 #include "espmissingincludes.h"
-
+#include "config.h"
 //Enable this to disallow any changes in AP settings
 //#define DEMO_MODE
 
@@ -146,15 +146,10 @@ static void ICACHE_FLASH_ATTR resetTimerCb(void *arg) {
 	int x=wifi_station_get_connect_status();
 	if (x==STATION_GOT_IP) {
 		//Go to STA mode. This needs a reset, so do that.
-		os_printf("Got IP. Going into STA mode..\n");
-		
-
-
-		os_printf("Connecting to the broker MQTT..");
-		mqttStartConnection();
-		wifiConnectCb(x);
-
+		os_printf("Got IP. Going to restart and connect to the Access Point..\n"); //---NOT i will just hide SSID
+		//os_printf("Connecting to the broker MQTT..");
 		wifi_set_opmode(1);
+		
 		system_restart();
 	} else {
 		os_printf("Connect fail. Not going into STA-only mode.\n");
@@ -169,6 +164,7 @@ static void ICACHE_FLASH_ATTR reassTimerCb(void *arg) {
 	int x;
 	static ETSTimer resetTimer;
 	os_printf("Try to connect to AP....\n");
+	
 	wifi_station_disconnect();
 	wifi_station_set_config(&stconf);
 	wifi_station_connect();
@@ -187,6 +183,8 @@ static void ICACHE_FLASH_ATTR reassTimerCb(void *arg) {
 int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	char essid[128];
 	char passwd[128];
+	char mqtt_host_ip[64];
+
 	static ETSTimer reassTimer;
 	
 	if (connData->conn==NULL) {
@@ -196,14 +194,23 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	
 	httpdFindArg(connData->postBuff, "essid", essid, sizeof(essid));
 	httpdFindArg(connData->postBuff, "passwd", passwd, sizeof(passwd));
+	httpdFindArg(connData->postBuff, "mqtthost", mqtt_host_ip, sizeof(mqtt_host_ip));
+
+	os_sprintf(ModuleSettings.ssid, "%s", essid);
+	os_sprintf(ModuleSettings.sta_pwd, "%s", passwd);
+	os_sprintf(ModuleSettings.mqtt_host, "%s", mqtt_host_ip);
+	ModuleSettings.mqtt_keepalive = 125;
+	WriteFlash();
 
 	os_strncpy((char*)stconf.ssid, essid, 32);
 	os_strncpy((char*)stconf.password, passwd, 64);
 	os_printf("Try to connect to AP %s pw %s\n", essid, passwd);
 
+	system_restart();
 	//Schedule disconnect/connect
 	os_timer_disarm(&reassTimer);
 	os_timer_setfn(&reassTimer, reassTimerCb, NULL);
+
 //Set to 0 if you want to disable the actual reconnecting bit
 #ifdef DEMO_MODE
 	httpdRedirect(connData, "/wifi");

@@ -330,6 +330,8 @@ mqtt_tcpclient_discon_cb(void *arg)
 void ICACHE_FLASH_ATTR
 mqtt_tcpclient_connect_cb(void *arg)
 {
+	SetAP(TRUE); //Set Hidden SSID after mqtt sucessfull
+	
 	struct espconn *pCon = (struct espconn *)arg;
 	MQTT_Client* client = (MQTT_Client *)pCon->reverse;
 

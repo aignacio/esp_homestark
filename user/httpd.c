@@ -483,7 +483,7 @@ void ICACHE_FLASH_ATTR httpdInit(HttpdBuiltInUrl *fixedUrls, int port) {
 	httpdConn.proto.tcp=&httpdTcp;
 	builtInUrls=fixedUrls;
 
-	os_printf("Httpd init, conn=%p\n", &httpdConn);
+	//os_printf("Httpd init, conn=%p\n", &httpdConn);
 	espconn_regist_connectcb(&httpdConn, httpdConnectCb);
 	espconn_accept(&httpdConn);
 }

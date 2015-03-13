@@ -1,4 +1,5 @@
-<html><head><title>WiFi connection</title>
+<html><head><title>HomeStark Device</title>
+<link rel="icon" type="image/jpeg" href="favicon.jpg"/>
 <link rel="stylesheet" type="text/css" href="style.css">
 <script type="text/javascript" src="140medley.min.js"></script>
 <script type="text/javascript">
@@ -74,7 +75,16 @@ window.onload=function(e) {
 </head>
 <body>
 <div id="main">
+<div id ="logo_scr">
+</div>
 <p>
+<b><h4>
+Powered by:<br>
+Anderson Ignacio da Silva<br>
+Guilherme Eduardo Cavalheiro<br>
+Armando Leopoldo Keller<br>
+</h4>
+</b>
 Current WiFi mode: %WiFiMode%
 </p>
 <p>
@@ -86,8 +96,11 @@ To connect to a WiFi network, please select one of the detected networks...<br>
 <div id="aps">Scanning...</div>
 <br>
 WiFi password, if applicable: <br />
-<input type="text" name="passwd" val="%WiFiPasswd%"> <br />
-<input type="submit" name="connect" value="Connect!">
+<input type="password" name="passwd" val="%WiFiPasswd%"> <br />
+<br>
+MQTT Broker IP: <br />
+<input type="text" name="mqtthost" val="%MQTTHostIP%"> <br><br>
+<input type="submit" name="connect" value="Connect!" style="width:100px; height:50px;">
 </p>
 </div>
 </body>

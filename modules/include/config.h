@@ -32,11 +32,12 @@
 #define USER_CONFIG_H_
 #include "os_type.h"
 #include "user_config.h"
+
 typedef struct{
 	uint32_t cfg_holder;
-	uint8_t device_id[16];
+	uint8_t device_id[42];
 
-	uint8_t sta_ssid[64];
+	uint8_t ssid[64];
 	uint8_t sta_pwd[64];
 	uint32_t sta_type;
 
@@ -56,6 +57,8 @@ typedef struct {
 void ICACHE_FLASH_ATTR CFG_Save();
 void ICACHE_FLASH_ATTR CFG_Load();
 
-extern SYSCFG sysCfg;
+void ICACHE_FLASH_ATTR WriteFlash();
+void ICACHE_FLASH_ATTR ReadFlash();
 
+extern SYSCFG sysCfg,ModuleSettings;
 #endif /* USER_CONFIG_H_ */

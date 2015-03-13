@@ -77,7 +77,7 @@ void ICACHE_FLASH_ATTR WIFI_Connect(uint8_t* ssid, uint8_t* pass, WifiCallback c
 {
 	struct station_config stationConf;
 
-	INFO("WIFI_INIT\r\n");
+	INFO("\n\rWIFI_INIT - MQTT\r\n");
 	wifi_set_opmode(STATION_MODE);
 	wifi_station_set_auto_connect(FALSE);
 	wifiCb = cb;

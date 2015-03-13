@@ -5,7 +5,7 @@ body {
 }
 
 #main {
-	background-color: #d0d0FF;
+	background-color: #FFFFFF;
 	-moz-border-radius: 5px;
 	-webkit-border-radius: 5px;
 	border-radius: 5px;
@@ -21,4 +21,19 @@ body {
 	width: 32px;
 	height: 32px;
 	display: inline-block;
+}
+
+#logo_scr
+{
+	text-align:	center;
+	float:center;
+	margin-left: auto ;
+	margin-right: auto ;
+	margin-bottom: auto;
+	width:	350px;
+	height:	96px;
+	background:url(logo_index.jpg);
+	background-repeat: no-repeat;
+	background-color: white;
+
 }
