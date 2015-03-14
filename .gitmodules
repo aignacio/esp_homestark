@@ -7,3 +7,6 @@
 [submodule "lib/heatshrink"]
 	path = lib/heatshrink
 	url = https://github.com/atomicobject/heatshrink
+[submodule "esp8266_easygpio"]
+	path = esp8266_easygpio
+	url = https://github.com/eadf/esp8266_easygpio.git

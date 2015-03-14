@@ -37,6 +37,7 @@ typedef struct{
 	uint32_t cfg_holder;
 	uint8_t device_id[42];
 
+	uint8_t configured[4];
 	uint8_t ssid[64];
 	uint8_t sta_pwd[64];
 	uint32_t sta_type;

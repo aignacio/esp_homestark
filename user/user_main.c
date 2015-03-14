@@ -5,7 +5,7 @@
 #   Date: 13/03/15											 
 #	Target: ESP-8266							 
 #	Inf.: http://www.esplatforms.blogspot.com.br 			 
-#	Pending: Communication Serial and topic configure in WS
+#	Pending: Topic configure in WS
 #	(WebServer)		
 #													 
 **************************************************************/
@@ -27,14 +27,17 @@
 #include "gpio.h"
 #include "debug.h"
 #include "user_interface.h"
-#include "uart.h"
+#include "driver/uart.h"
 
+#define INFO 		os_printf
+#define PORT_WS 	80
+#define AP_SSID		"Homestark"
+#define AP_PASSWORD	"homestark123"
 
-#define INFO 					os_printf
-#define PORT_WS 				80
-#define AP_SSID					"Homestark"
-#define AP_PASSWORD				"homestark123"
-
+#define BTN_CLEAR_DATA	GPIO13
+ 
+#define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
+#define LED_2(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(5), x) 
 /* Global */
 char ap_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
 	 sta_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
@@ -43,7 +46,8 @@ char ap_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
 	 broker_web[20];
 
 MQTT_Client 	mqttClient;
-os_event_t   	user_procTaskQueue[user_procTaskQueueLen];
+bool 			blinkS = true;
+static ETSTimer StatusTimer;
 
 HttpdBuiltInUrl builtInUrls[]={
 	{"/", cgiRedirect, "/wifi/wifi.tpl"},
@@ -68,13 +72,13 @@ void wifiConnectCb(uint8_t status) {
 void mqttConnectedCb(uint32_t *args) {
 	MQTT_Client* client = (MQTT_Client*)args;
 	INFO("MQTT: Connected\r\n");
-	MQTT_Subscribe(client, "/mqtt/topic/0", 0);
-	MQTT_Subscribe(client, "/mqtt/topic/1", 1);
-	MQTT_Subscribe(client, "/mqtt/topic/2", 2);
+	MQTT_Subscribe(client, "/light/current", 0);
+	MQTT_Subscribe(client, "/light/dimmer", 1);
+	MQTT_Subscribe(client, "/light/config", 2);
 
-	MQTT_Publish(client, "/mqtt/topic/0", "hello0", 6, 0, 0);
-	MQTT_Publish(client, "/mqtt/topic/1", "hello1", 6, 1, 0);
-	MQTT_Publish(client, "/mqtt/topic/2", "hello2", 6, 2, 0);
+	MQTT_Publish(client, "/light/current", "0.755mA", 7, 0, 0);
+	MQTT_Publish(client, "/light/dimmer", "50", 2, 1, 0);
+	MQTT_Publish(client, "/light/config", "default", 7, 2, 0);
 }
 
 void mqttDisconnectedCb(uint32_t *args) {
@@ -127,7 +131,7 @@ void mqttStartConnection() {
 	InitWS();	
 }
 
-void tcpMobileCfg() {
+void APSettings() {
 	/****** Print Some inf. about ESP ******/
 	os_printf("\n\n");
 	os_printf("\nPrinting AP Settings:\n");
@@ -250,15 +254,110 @@ void InitWS() {
 	os_printf("\nHttpd Web server at PORT:%d - Ready\n\r",PORT_WS);
 }
 
+void interruptHandler(){
+	uint32 gpio_status;
+	bool status_reset_button;
+	gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
+
+	if(gpio_status & BIT(13))
+	{
+		//clear interrupt status
+		gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_DISABLE);
+		GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpio_status & BIT(13));
+
+		//If we get here, we dont configure the flash yeat with user_config.h data, now let's save to flash
+		os_memset(&ModuleSettings, 0x00, sizeof ModuleSettings);
+		ModuleSettings.cfg_holder = 0x00FF55A6;
+		os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
+		os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
+		os_sprintf(ModuleSettings.sta_pwd, "%s", STA_PASS);
+		ModuleSettings.sta_type = STA_TYPE;
+		os_sprintf(ModuleSettings.device_id, MQTT_CLIENT_ID, system_get_chip_id());
+		os_sprintf(ModuleSettings.mqtt_host, "%s", MQTT_HOST);
+		ModuleSettings.mqtt_port = MQTT_PORT;
+		os_sprintf(ModuleSettings.mqtt_user, "%s", MQTT_USER);
+		os_sprintf(ModuleSettings.mqtt_pass, "%s", MQTT_PASS);
+		ModuleSettings.security = DEFAULT_SECURITY;	/* default non ssl */
+		ModuleSettings.mqtt_keepalive = MQTT_KEEPALIVE;
+		os_sprintf(ModuleSettings.configured, "%s", "RST");
+
+		WriteFlash();
+ 		
+ 		system_restart();
+		//if(status_reset_button)
+			//INFO("\nz\rPUSH BUTTON PRESSED");
+		//else
+		//	INFO("\n\rPUSH BUTTON NOT PRESSED");
+
+		gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_POSEDGE);
+	}
+}
+
+void ConfigureGPIO() {
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4);
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5);
+
+	//Setting interrupt in pin GPIO13 - Button Reset AP
+	PIN_FUNC_SELECT(PERIPHS_IO_MUX_MTCK_U, FUNC_GPIO13);
+	PIN_PULLDWN_EN(PERIPHS_IO_MUX_MTCK_U);
+
+	ETS_GPIO_INTR_ATTACH(interruptHandler, NULL);
+	ETS_GPIO_INTR_DISABLE();
+	GPIO_DIS_OUTPUT(GPIO_ID_PIN(13));
+	gpio_register_set(GPIO_ID_PIN(13), GPIO_PIN_INT_TYPE_SET(GPIO_PIN_INTR_DISABLE)
+                    | GPIO_PIN_PAD_DRIVER_SET(GPIO_PAD_DRIVER_DISABLE)
+                    | GPIO_PIN_SOURCE_SET(GPIO_AS_PIN_SOURCE));
+	GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, BIT(13));
+  	gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_POSEDGE);
+  	ETS_GPIO_INTR_ENABLE();
+}
+
+void BlinkStatusCB() {
+	if(os_strstr(ModuleSettings.configured,"OK")) {
+		LED_1(1);
+		LED_2(1);
+		// if(blinkS){
+		// 	LED_1(1);
+		// 	LED_2(0);
+		// 	blinkS = false;
+		// }
+		// else{
+		// 	LED_1(0);
+		// 	LED_2(1);
+		// 	blinkS = true;
+		// }
+	}
+	else
+		if(blinkS){
+			LED_1(1);
+			LED_2(0);
+			blinkS = false;
+		}
+		else{
+			LED_1(0);
+			LED_2(1);
+			blinkS = true;
+		}
+  	os_timer_disarm(&StatusTimer);
+	os_timer_setfn(&StatusTimer, BlinkStatusCB, NULL);
+	os_timer_arm(&StatusTimer, 500, 0);
+}
+
 void user_init(void) {
-	stdoutInit();
+	uart_init(BIT_RATE_115200,BIT_RATE_115200);//stdoutInit();
+
 	os_delay_us(1000000);
 
 	ShowDevice();
+  	ConfigureGPIO();
   	RestoreFlash();
   	SetAP(false);
- 
-  	if(ModuleSettings.mqtt_keepalive == 125)
+ 	
+  	os_timer_disarm(&StatusTimer);
+	os_timer_setfn(&StatusTimer, BlinkStatusCB, NULL);
+	os_timer_arm(&StatusTimer, 500, 0);
+	
+  	if(os_strstr(ModuleSettings.configured,"OK"))
   		mqttStartConnection();
   	else
   		InitWS();

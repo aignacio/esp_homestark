@@ -199,14 +199,15 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 	os_sprintf(ModuleSettings.ssid, "%s", essid);
 	os_sprintf(ModuleSettings.sta_pwd, "%s", passwd);
 	os_sprintf(ModuleSettings.mqtt_host, "%s", mqtt_host_ip);
-	ModuleSettings.mqtt_keepalive = 125;
+	os_sprintf(ModuleSettings.configured, "%s", "OK");
+	
 	WriteFlash();
+	system_restart();
 
 	os_strncpy((char*)stconf.ssid, essid, 32);
 	os_strncpy((char*)stconf.password, passwd, 64);
 	os_printf("Try to connect to AP %s pw %s\n", essid, passwd);
 
-	system_restart();
 	//Schedule disconnect/connect
 	os_timer_disarm(&reassTimer);
 	os_timer_setfn(&reassTimer, reassTimerCb, NULL);
