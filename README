@@ -1,86 +1,48 @@
-esp-httpd README
+  esp_homestark
+=================
 
-This is a small but powerful webserver for ESP8266(EX) chips. Included is an example of how
-to make a module that can have the AP it connects to configured over a webbrowser.
+This is fork mixed of [esp_mqtt](https://github.com/tuanpmt/esp_mqtt) and [esphttpd](http://git.spritesserver.nl/esphttpd.git/). 
+The library for compressing the files is a submodule then you need to add with:
+  
+    cd esp_homestark
+    git submodule init
+    git submodule update
 
-ABOUT THE WEBSERVER
+When you program the ESP8266, you need to connect to the module and then access his [ip address](192.168.4.1),
+when you open the page, the wi-fi ap's will be listed to you connect. After connected, the module will try to 
+connect the broker at the defines in /include/user_config.h
 
-The Good (aka: what's awesome)
- - Supports multiple connections, for eg simultaneous html/css/js/images downloading
- - Static files stored in flash, in an (optionally compressed) RO filesystem
- - Pluggable using external cgi routines
- - Simple template engine for mixed c and html things
+    #define MQTT_HOST		"192.168.0.12"
+    #define MQTT_PORT		1883
 
-The Bad (aka: what can be improved)
- - Not built for speediness, although it's reasonable fast.
- - Built according to what I remember of the HTTP protocol, not according to the
-   RFCs. Should work with most modern browsers, though.
- - No support for https.
+Then, after connected to the broker of the [MQTT network](http://mqtt.org/), the device will subscribe in 
+these topics and post some data:
 
-The Ugly (aka: bugs, misbehaviour)
-- Possible buffer overflows (usually not remotely exploitable) due to no os_snprintf
-  This can be theoretically remedied by either Espressif including an os_snprintf in 
-  their libs or by using some alternate printf lib, like elm-chans xprintf
+    /mqtt/topic/2
+    /mqtt/topic/1
+    /mqtt/topic/0
 
-ABOUT THE EXAMPLE
+You still can use a websocket in python to connect to your's localhost broker like [mosquitto](http://mosquitto.org/):
+These tutorial's can help you in this, but you need to compile by your own pc at the moment:
 
-When you flash the example into an ESP8266(EX) module, you get a small webserver with a few example
-pages. If you've already connected your module to your WLAN before, it'll keep those settings. When
-you haven't or the settings are wrong, keep GPIO0 for >5 seconds. The module will reboot into
-its STA+AP mode. Connect a computer to the newly formed access point and browse to 
-http://192.168.4.1/wifi in order to connect the module to your WiFi network. The example also
-allows you to control a LED that's connected to GPIO2.
+* [Websocket Client js](http://jpmens.net/2014/07/03/the-mosquitto-mqtt-broker-gets-websockets-support/)
+* [Building Mosquitto with support for websocket](https://goochgooch.wordpress.com/2014/08/01/building-mosquitto-1-4/)
 
-BUILDING EVERYTHING
+![ScreenShot](http://s17.postimg.org/k4y9ohc4v/teste.jpg)
 
-For this, you need an environment that can compile ESP8266 firmware. Environments for this still
-are in flux at the moment, but I'm using esp-open-sdk: https://github.com/pfalcon/esp-open-sdk .
-You probably also need an UNIX-like system; I'm working on Debian Linux myself. 
+__Requirements:__
+ 
+* [SDK Espressif and tools](https://github.com/esp8266/esp8266-wiki/wiki/Toolchain)
 
-To manage the paths to all this, you can source a small shell fragment into your current session. For
-example, I source a file with these contents:
-export PATH=${PWD}/esp-open-sdk/xtensa-lx106-elf/bin:$PATH
-export SDK_BASE=${PWD}/esp-open-sdk/sdk
-export ESPTOOL=${PWD}/esptool/esptool
-export ESPPORT=/dev/ttyUSB0
-export ESPBAUD=460800
+__Instructions:__
 
-Actual setup of the SDK and toolchain is out of the scope of this document, so I hope this helps you
-enough to set up your own if you haven't already. 
+To compile and flash is simple, just follow these steps:
 
-If you have that, you can clone out the source code:
-git clone http://git.spritesserver.nl/esphttpd.git/
+    cd esp_homestark
+    make clean
+    make all
 
-This project makes use of heatshrink, which is a git submodule. To fetch the code:
-cd esphttpd
-git submodule init
-git submodule update
+Flash:
 
-Now, build the code:
-make
-
-Flash the code happens in 2 steps. First the code itself gets flashed. Reset the module into bootloader
-mode and enter 'make flash'. You may want to reset and re-enter the bootloader halfway (at 'sleep 3') for
-the 2nd part of this flash to work.
-
-The 2nd step is to pack the static files the webserver will serve and flash that. Reset the module into
-bootloader mode again and enter 'make htmlflash'.
-
-You should have a working webserver now.
-
-WRITING CODE FOR THE WEBSERVER
-
-...errm... to be done. For now, look at the examples. Hey, you probably managed to find out how
-the SDK works, this shouldn't be too hard :P
-
-
-CHANGE FROM SDK 0.9.3 (and earlier) TO SDK 0.9.4 (and later):
-Change all occurences of
-espconn_sent(connData->conn, (uint8 *)buff, len);
-to
-httpdSend(connData, buff, len)
-please. The reason for this is that you can't do multiple espconn_sent calls serially anymore, so
-httpd needs to buffer the writes now. This is only needed in your own code; the code that comes
-with httpd already has this changed.
-
-
+    make flash
+    make htmlflash 
