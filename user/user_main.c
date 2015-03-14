@@ -29,12 +29,13 @@
 #include "user_interface.h"
 #include "driver/uart.h"
 
-#define INFO 		os_printf
-#define PORT_WS 	80
-#define AP_SSID		"Homestark"
-#define AP_PASSWORD	"homestark123"
-
-#define BTN_CLEAR_DATA	GPIO13
+#define INFO 			os_printf
+#define PORT_WS 		80
+#define AP_SSID			"Homestark %08X"
+#define AP_PASSWORD		"homestark123"
+	
+#define TOPIC_MASTER	"/lights/%08X/dimmer/"
+#define TOPIC_STATUS	"/lights/%08X/current/"
  
 #define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
 #define LED_2(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(5), x) 
@@ -72,13 +73,22 @@ void wifiConnectCb(uint8_t status) {
 void mqttConnectedCb(uint32_t *args) {
 	MQTT_Client* client = (MQTT_Client*)args;
 	INFO("MQTT: Connected\r\n");
-	MQTT_Subscribe(client, "/light/current", 0);
-	MQTT_Subscribe(client, "/light/dimmer", 1);
-	MQTT_Subscribe(client, "/light/config", 2);
 
-	MQTT_Publish(client, "/light/current", "0.755mA", 7, 0, 0);
-	MQTT_Publish(client, "/light/dimmer", "50", 2, 1, 0);
-	MQTT_Publish(client, "/light/config", "default", 7, 2, 0);
+	uint8_t topic_1[64],topic_2[64];
+
+	os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
+	os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
+		
+	MQTT_Subscribe(client, topic_1, 0);
+	MQTT_Subscribe(client, topic_2, 1);
+	//MQTT_Subscribe(client, "/light/config", 2);
+
+	MQTT_Publish(client, topic_1, "50", sizeof("50"), 0, 0);
+	MQTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
+
+	// MQTT_Publish(client, "/light/current", "0.755mA", 7, 0, 0);
+	// MQTT_Publish(client, "/light/dimmer", "50", 2, 1, 0);
+	// MQTT_Publish(client, "/light/config", "default", 7, 2, 0);
 }
 
 void mqttDisconnectedCb(uint32_t *args) {
@@ -174,24 +184,29 @@ void APSettings() {
 void SetAP(bool ssid_hidden) {
 	static char ssid[33];
 	static char password[33];
-		
+	char macaddr[6];
+	
 	struct softap_config apConfig;
   	wifi_softap_get_config(&apConfig);
 
 	wifi_set_opmode(STATIONAP_MODE);
-
+	
 	os_memset(apConfig.password, 0, sizeof(apConfig.password));
 	os_sprintf(password, "%s", AP_PASSWORD);
 	os_memcpy(apConfig.password, password, os_strlen(password));
 
 	os_memset(apConfig.ssid, 0, sizeof(apConfig.ssid));
-	os_sprintf(ssid, "%s %08X", AP_SSID, system_get_chip_id());
+	wifi_get_macaddr(SOFTAP_IF, macaddr);
+	apConfig.ssid_len = os_sprintf(apConfig.ssid, "Homestark_%02x%02x%02x%02x%02x%02x", MAC2STR(macaddr));
+
+
+	os_sprintf(ssid, AP_SSID, system_get_chip_id());
 	os_memcpy(apConfig.ssid, ssid, os_strlen(ssid));
 
 	//apConfig.authmode = AUTH_WEP;
-	//apConfig.authmode = AUTH_OPEN;
-	apConfig.authmode = AUTH_WPA_WPA2_PSK;
-	apConfig.channel = 4;
+	apConfig.authmode = AUTH_OPEN;
+	//apConfig.authmode = AUTH_WPA_WPA2_PSK;
+	apConfig.channel = 7;
 	apConfig.max_connection = 10;
 	if(!ssid_hidden)	
 		apConfig.ssid_hidden = 0;
