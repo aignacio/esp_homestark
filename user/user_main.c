@@ -39,6 +39,7 @@
  
 #define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
 #define LED_2(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(5), x) 
+
 /* Global */
 char ap_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
 	 sta_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
@@ -47,18 +48,30 @@ char ap_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
 	 broker_web[20];
 
 MQTT_Client 	mqttClient;
+//MQTT_Client* 	mqttClient_P;
+
 bool 			blinkS = true;
 static ETSTimer StatusTimer;
 
 HttpdBuiltInUrl builtInUrls[]={
 	{"/", cgiRedirect, "/wifi/wifi.tpl"},
 	{"/wifi/wifiscan.cgi", cgiWiFiScan, NULL},
-	{"/wifi/wifi.tpl", cgiEspFsTemplate, tplWlan},
+	{"/wifi/wifi.t8pl", cgiEspFsTemplate, tplWlan},
 	{"/wifi/connect.cgi", cgiWiFiConnect, NULL},
 	{"/wifi/setmode.cgi", cgiWifiSetMode, NULL},
 	{"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
 	{NULL, NULL, NULL}
 };
+
+typedef enum states
+{
+  FIRST_IDT,
+  DATA_B,
+  COMPLETE
+}states_buffer;
+
+states_buffer serial_s = FIRST_IDT;
+uint8 buffer_current[4],i = 0;
 
 /* Global */
 
@@ -114,6 +127,7 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
 	dataBuf[data_len] = 0;
 
 	INFO("Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
+	INFO("@%s@",dataBuf);
 	os_free(topicBuf);
 	os_free(dataBuf);
 }
@@ -356,6 +370,42 @@ void BlinkStatusCB() {
   	os_timer_disarm(&StatusTimer);
 	os_timer_setfn(&StatusTimer, BlinkStatusCB, NULL);
 	os_timer_arm(&StatusTimer, 500, 0);
+}
+
+void SendMQTT()
+{
+
+  uint8_t topic_1[64],topic_2[64];
+
+  os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
+  os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
+
+  i = 0;
+  MQTT_Publish(&mqttClient, topic_2, buffer_current, sizeof(buffer_current), 1, 0);
+  serial_s = FIRST_IDT;
+}
+
+void RecChar(uint8 CharBuffer)
+{
+  switch(serial_s)
+  {
+    case FIRST_IDT:
+      if(CharBuffer == '@')
+        serial_s = DATA_B;
+    break;
+    case DATA_B:
+        if(CharBuffer != '@' && i < 4)
+        {
+          buffer_current[i] = CharBuffer;
+          i++;
+        }
+        else
+          serial_s = COMPLETE; 
+    break;
+  }
+
+  if(serial_s == COMPLETE)    SendMQTT();
+
 }
 
 void user_init(void) {
