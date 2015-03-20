@@ -40,6 +40,8 @@
 #include "mqtt.h"
 #include "queue.h"
 
+#define TRY_MQTT                   10
+#define TIME_TIMEOUT			 1000	
 #define MQTT_TASK_PRIO        		0
 #define MQTT_TASK_QUEUE_SIZE    	1
 #define MQTT_SEND_TIMOUT			5
@@ -48,10 +50,13 @@
 #define QUEUE_BUFFER_SIZE		 	2048
 #endif
 
+bool enableTimeoutTimer = 1;
+uint8_t TryConnect = TRY_MQTT;
 unsigned char *default_certificate;
 unsigned int default_certificate_len = 0;
 unsigned char *default_private_key;
 unsigned int default_private_key_len = 0;
+os_timer_t timeout_timer_mqtt;
 
 os_event_t mqtt_procTaskQueue[MQTT_TASK_QUEUE_SIZE];
 
@@ -92,8 +97,6 @@ mqtt_dns_found(const char *name, ip_addr_t *ipaddr, void *arg)
 	system_os_post(MQTT_TASK_PRIO, 0, (os_param_t)client);
 }
 
-
-
 LOCAL void ICACHE_FLASH_ATTR
 deliver_publish(MQTT_Client* client, uint8_t* message, int length)
 {
@@ -108,7 +111,6 @@ deliver_publish(MQTT_Client* client, uint8_t* message, int length)
 		client->dataCb((uint32_t*)client, event_data.topic, event_data.topic_length, event_data.data, event_data.data_length);
 
 }
-
 
 /**
   * @brief  Client received callback function.
@@ -320,8 +322,6 @@ mqtt_tcpclient_discon_cb(void *arg)
 	system_os_post(MQTT_TASK_PRIO, 0, (os_param_t)client);
 }
 
-
-
 /**
   * @brief  Tcp client connect success callback function.
   * @param  arg: contain the ip link information
@@ -372,6 +372,9 @@ mqtt_tcpclient_recon_cb(void *arg, sint8 errType)
 	MQTT_Client* client = (MQTT_Client *)pCon->reverse;
 
 	INFO("TCP: Reconnect to %s:%d\r\n", client->host, client->port);
+
+	INFO("\n\n\rTry to connect:%d",TRY_MQTT-TryConnect);
+
 
 	client->connState = TCP_RECONNECT_REQ;
 
@@ -603,6 +606,7 @@ MQTT_Connect(MQTT_Client *mqttClient)
 
 	if(UTILS_StrToIP(mqttClient->host, &mqttClient->pCon->proto.tcp->remote_ip)) {
 		INFO("TCP: Connect to ip  %s:%d\r\n", mqttClient->host, mqttClient->port);
+		enableTimeout();
 		if(mqttClient->security){
 			espconn_secure_connect(mqttClient->pCon);
 		}
@@ -613,8 +617,28 @@ MQTT_Connect(MQTT_Client *mqttClient)
 	else {
 		INFO("TCP: Connect to domain %s:%d\r\n", mqttClient->host, mqttClient->port);
 		espconn_gethostbyname(mqttClient->pCon, mqttClient->host, &mqttClient->ip, mqtt_dns_found);
+		enableTimeout();
 	}
 	mqttClient->connState = TCP_CONNECTING;
+}
+
+void timeout_timerCb(){
+	if(enableTimeoutTimer){
+		INFO("\n[Timeout]Try number:%d",TRY_MQTT-TryConnect);
+		TryConnect--;
+		if(!TryConnect)
+			ResetToAP();
+		os_timer_disarm(&timeout_timer_mqtt);
+	    os_timer_setfn(&timeout_timer_mqtt, (os_timer_func_t *)timeout_timerCb, NULL);
+	    os_timer_arm(&timeout_timer_mqtt, TIME_TIMEOUT, 0);
+	}
+}
+
+void enableTimeout(){
+	INFO("\n\n\rTimeout Timer Enabled!");
+	os_timer_disarm(&timeout_timer_mqtt);
+    os_timer_setfn(&timeout_timer_mqtt, (os_timer_func_t *)timeout_timerCb, NULL);
+    os_timer_arm(&timeout_timer_mqtt, TIME_TIMEOUT, 0);
 }
 
 void ICACHE_FLASH_ATTR
@@ -633,6 +657,8 @@ MQTT_Disconnect(MQTT_Client *mqttClient)
 void ICACHE_FLASH_ATTR
 MQTT_OnConnected(MQTT_Client *mqttClient, MqttCallback connectedCb)
 {
+	os_timer_disarm(&timeout_timer_mqtt);
+	enableTimeoutTimer = 0;
 	mqttClient->connectedCb = connectedCb;
 }
 

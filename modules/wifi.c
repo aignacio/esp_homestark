@@ -15,6 +15,13 @@
 #include "user_config.h"
 #include "config.h"
 
+#define TRY_AP                   10
+#define TIME_TIMEOUT_AP			 1000	
+
+bool enableTimeoutTimerAP = 1;
+uint8_t TryConnectAP = TRY_AP;
+os_timer_t timeout_timer_ap;
+
 static ETSTimer WiFiLinker;
 WifiCallback wifiCb = NULL;
 static uint8_t wifiStatus = STATION_IDLE, lastWifiStatus = STATION_IDLE;
@@ -30,7 +37,8 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 
 		os_timer_setfn(&WiFiLinker, (os_timer_func_t *)wifi_check_ip, NULL);
 		os_timer_arm(&WiFiLinker, 2000, 0);
-
+		enableTimeoutTimerAP = 0;
+		os_timer_disarm(&timeout_timer_ap);
 
 	}
 	else
@@ -73,6 +81,26 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 	}
 }
 
+void timeout_timerWifiCb(){
+	if(enableTimeoutTimerAP){
+		INFO("\n[Timeout]Try number:%d",TRY_AP-TryConnectAP);
+		TryConnectAP--;
+		if(!TryConnectAP)
+			ResetToAP();
+		os_timer_disarm(&timeout_timer_ap);
+	    os_timer_setfn(&timeout_timer_ap, (os_timer_func_t *)timeout_timerWifiCb, NULL);
+	    os_timer_arm(&timeout_timer_ap, TIME_TIMEOUT_AP, 0);
+	}
+}
+
+void EnableTimeout(){
+	INFO("\n\n\rTimeout Timer Enabled!");
+	os_timer_disarm(&timeout_timer_ap);
+    os_timer_setfn(&timeout_timer_ap, (os_timer_func_t *)timeout_timerWifiCb, NULL);
+    os_timer_arm(&timeout_timer_ap, TIME_TIMEOUT_AP, 0);
+}
+
+
 void ICACHE_FLASH_ATTR WIFI_Connect(uint8_t* ssid, uint8_t* pass, WifiCallback cb)
 {
 	struct station_config stationConf;
@@ -95,5 +123,6 @@ void ICACHE_FLASH_ATTR WIFI_Connect(uint8_t* ssid, uint8_t* pass, WifiCallback c
 
 	wifi_station_set_auto_connect(TRUE);
 	wifi_station_connect();
+	EnableTimeout();
 }
 

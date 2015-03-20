@@ -2,7 +2,7 @@
 #															 
 #	Project: Homestark - Device code of ESP8266   
 #	Author: Anderson Ignacio da Silva						 
-#   Date: 13/03/15											 
+#   Date: 20/03/15											 
 #	Target: ESP-8266							 
 #	Inf.: http://www.esplatforms.blogspot.com.br 			 
 #	Pending: Topic configure in WS
@@ -33,6 +33,7 @@
 #define PORT_WS 		80
 #define AP_SSID			"Homestark %08X"
 #define AP_PASSWORD		"homestark123"
+#define FW_VERSION		"[Device Homestark - v1.0 2015]"
 	
 #define TOPIC_MASTER	"/lights/%08X/dimmer/"
 #define TOPIC_STATUS	"/lights/%08X/current/"
@@ -262,7 +263,7 @@ void ShowDevice() {
 	wifi_get_macaddr(STATION_IF,sta_mac);
 	wifi_get_macaddr(SOFTAP_IF,ap_mac);
 
-	INFO("\n\n\n\n[Device Homestark]\n");	
+	INFO("\n\n\n\n%s\n",FW_VERSION);	
 	INFO("\n\r\tAP MAC: ");
 	for (i = 0; i < 6; ++i)
       INFO(" %02x:", (unsigned char) ap_mac[i]);
@@ -293,33 +294,37 @@ void interruptHandler(){
 		//clear interrupt status
 		gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_DISABLE);
 		GPIO_REG_WRITE(GPIO_STATUS_W1TC_ADDRESS, gpio_status & BIT(13));
-
-		//If we get here, we dont configure the flash yeat with user_config.h data, now let's save to flash
-		os_memset(&ModuleSettings, 0x00, sizeof ModuleSettings);
-		ModuleSettings.cfg_holder = 0x00FF55A6;
-		os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
-		os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
-		os_sprintf(ModuleSettings.sta_pwd, "%s", STA_PASS);
-		ModuleSettings.sta_type = STA_TYPE;
-		os_sprintf(ModuleSettings.device_id, MQTT_CLIENT_ID, system_get_chip_id());
-		os_sprintf(ModuleSettings.mqtt_host, "%s", MQTT_HOST);
-		ModuleSettings.mqtt_port = MQTT_PORT;
-		os_sprintf(ModuleSettings.mqtt_user, "%s", MQTT_USER);
-		os_sprintf(ModuleSettings.mqtt_pass, "%s", MQTT_PASS);
-		ModuleSettings.security = DEFAULT_SECURITY;	/* default non ssl */
-		ModuleSettings.mqtt_keepalive = MQTT_KEEPALIVE;
-		os_sprintf(ModuleSettings.configured, "%s", "RST");
-
-		WriteFlash();
- 		
- 		system_restart();
+		gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_POSEDGE);
+		ResetToAP();
 		//if(status_reset_button)
 			//INFO("\nz\rPUSH BUTTON PRESSED");
 		//else
 		//	INFO("\n\rPUSH BUTTON NOT PRESSED");
 
-		gpio_pin_intr_state_set(GPIO_ID_PIN(13), GPIO_PIN_INTR_POSEDGE);
+		
 	}
+}
+
+void ResetToAP(){
+	//If we get here, we dont configure the flash yeat with user_config.h data, now let's save to flash
+	os_memset(&ModuleSettings, 0x00, sizeof ModuleSettings);
+	ModuleSettings.cfg_holder = 0x00FF55A6;
+	os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
+	os_sprintf(ModuleSettings.ssid, "%s", STA_SSID);
+	os_sprintf(ModuleSettings.sta_pwd, "%s", STA_PASS);
+	ModuleSettings.sta_type = STA_TYPE;
+	os_sprintf(ModuleSettings.device_id, MQTT_CLIENT_ID, system_get_chip_id());
+	os_sprintf(ModuleSettings.mqtt_host, "%s", MQTT_HOST);
+	ModuleSettings.mqtt_port = MQTT_PORT;
+	os_sprintf(ModuleSettings.mqtt_user, "%s", MQTT_USER);
+	os_sprintf(ModuleSettings.mqtt_pass, "%s", MQTT_PASS);
+	ModuleSettings.security = DEFAULT_SECURITY;	/* default non ssl */
+	ModuleSettings.mqtt_keepalive = MQTT_KEEPALIVE;
+	os_sprintf(ModuleSettings.configured, "%s", "RST");
+
+	WriteFlash();
+
+	system_restart();
 }
 
 void ConfigureGPIO() {
@@ -390,11 +395,11 @@ void RecChar(uint8 CharBuffer)
   switch(serial_s)
   {
     case FIRST_IDT:
-      if(CharBuffer == '@')
+      if(CharBuffer == '#')
         serial_s = DATA_B;
     break;
     case DATA_B:
-        if(CharBuffer != '@' && i < 4)
+        if(CharBuffer != '#' && i < 4)
         {
           buffer_current[i] = CharBuffer;
           i++;
