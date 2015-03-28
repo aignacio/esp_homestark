@@ -1,4 +1,4 @@
-<img src="http://s27.postimg.org/iflbj5w4z/logo_index.jpg" height="45" width="150">
+<img src="http://s27.postimg.org/iflbj5w4z/logo_index.jpg" height="75" width="250">
 =================
 
 ESP8266 - Firmware
