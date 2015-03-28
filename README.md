@@ -1,7 +1,7 @@
-<img src="http://s27.postimg.org/iflbj5w4z/logo_index.jpg" height="45" width="150">
+<img src="http://s27.postimg.org/iflbj5w4z/logo_index.jpg" height=75" width="250">
 =================
 
-ESP8266 - Firmware
+<h1>ESP8266 - Firmware</h1>
 
 This is fork mixed of [esp_mqtt](https://github.com/tuanpmt/esp_mqtt) and [esphttpd](http://git.spritesserver.nl/esphttpd.git/). 
 The library for compressing the files is a submodule then you need to add with:
