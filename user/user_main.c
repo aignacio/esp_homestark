@@ -28,18 +28,23 @@
 #include "debug.h"
 #include "user_interface.h"
 #include "driver/uart.h"
+#include "ip_addr.h"
+#include "espconn.h"
+#include "user_interface.h"
 
 #define INFO 			os_printf
 #define PORT_WS 		80
 #define AP_SSID			"Homestark %08X"
 #define AP_PASSWORD		"homestark123"
 #define FW_VERSION		"[Device Homestark - v1.0 2015]"
-	
+#define CONFIG_UDP_PORT 8080
+
 #define TOPIC_MASTER	"/lights/%08X/dimmer/"
 #define TOPIC_STATUS	"/lights/%08X/current/"
  
 #define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
 #define LED_2(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(5), x) 
+
 
 /* Global */
 char ap_mac[6]={0x00,0x00,0x00,0x00,0x00,0x00},
@@ -53,6 +58,7 @@ MQTT_Client 	mqttClient;
 
 bool 			blinkS = true;
 static ETSTimer StatusTimer;
+static struct espconn *pUdpServer;
 
 HttpdBuiltInUrl builtInUrls[]={
 	{"/", cgiRedirect, "/wifi/wifi.tpl"},
@@ -76,11 +82,21 @@ uint8 buffer_current[4],i = 0;
 
 /* Global */
 
-void wifiConnectCb(uint8_t status) {
+void MQTTwifiConnectCb(uint8_t status) {
 	if(status == STATION_GOT_IP){
 		MQTT_Connect(&mqttClient);
 	} else {
 		MQTT_Disconnect(&mqttClient);
+	}
+}
+
+void wifiConnectCb(uint8_t status) {
+	if(status == STATION_GOT_IP){
+		udp_init();
+		//MQTT_Connect(&mqttClient);
+	} else {
+		//INFO("\n\rProblem to get IP from router!");
+		//MQTT_Disconnect(&mqttClient);
 	}
 }
 
@@ -149,11 +165,10 @@ void mqttStartConnection() {
 	MQTT_OnData(&mqttClient, mqttDataCb);
 
 	//MQTT_Connect(&mqttClient);
-	
-	WIFI_Connect(ModuleSettings.ssid, ModuleSettings.sta_pwd, wifiConnectCb);
-	
+	MQTT_Connect(&mqttClient);
+
 	INFO("\r\nSystem MQTT started ...\r\n");
-	InitWS();	
+	//InitWS();	
 }
 
 void APSettings() {
@@ -413,6 +428,66 @@ void RecChar(uint8 CharBuffer)
 
 }
 
+LOCAL void ICACHE_FLASH_ATTR
+udpserver_recv(void *arg, char *data, unsigned short length)
+{
+	uint8_t i=0, j=0, ip_broker[15];
+
+	if(*(data+0) == 'B' && 
+	   *(data+1) == 'r' &&
+	   *(data+2) == 'o' && 
+	   *(data+3) == 'k' &&
+	   *(data+4) == 'e' &&
+	   *(data+5) == 'r' &&
+	   *(data+6) == ':'
+	   )
+	{
+		INFO("\n\rIP Address received from Broker [MQTT]\n\r");
+		while(i<15){  
+			ip_broker[i] = *(data+7+i);
+			i++;
+		}
+		os_sprintf(ModuleSettings.mqtt_host, "%s", ip_broker);
+		os_sprintf(ModuleSettings.configured, "%s", "OK");
+		WriteFlash();
+		mqttStartConnection();
+	}
+	
+    INFO("\n\nData received via UDP:%s",data);
+}
+
+void ICACHE_FLASH_ATTR
+udp_init(void)
+{
+    // allocate memory for the control block
+    pUdpServer = (struct espconn *)os_zalloc(sizeof(struct espconn));
+
+    // fill memory with 0 bytes
+    ets_memset( pUdpServer, 0, sizeof( struct espconn ) );
+
+    // create the connection from block
+    espconn_create( pUdpServer );
+
+    // set connection to UDP
+    pUdpServer->type = ESPCONN_UDP;
+
+    // alloc memory for the udp object in the server context and assign port
+    pUdpServer->proto.udp = (esp_udp *)os_zalloc(sizeof(esp_udp));
+    pUdpServer->proto.udp->local_port = CONFIG_UDP_PORT;
+
+    // register the callback function for receiving data
+    espconn_regist_recvcb(pUdpServer, udpserver_recv);
+
+    espconn_create( pUdpServer );
+    // if( espconn_create( pUdpServer ) )
+    // {
+    //     //while(1);
+    //     INFO("\n\nUDP Server created!");
+    // }
+    // else
+    // 	INFO("\n\nProblem to create udp server!");
+}
+
 void user_init(void) {
 	uart_init(BIT_RATE_115200,BIT_RATE_115200);//stdoutInit();
 
@@ -427,9 +502,14 @@ void user_init(void) {
 	os_timer_setfn(&StatusTimer, BlinkStatusCB, NULL);
 	os_timer_arm(&StatusTimer, 500, 0);
 	
-  	if(os_strstr(ModuleSettings.configured,"OK"))
+  	if(os_strstr(ModuleSettings.configured,"NO")){ //Almost configured, now we connect to wifi and wait for broadcast UDP
+  		WIFI_Connect(ModuleSettings.ssid, ModuleSettings.sta_pwd, wifiConnectCb); //mqttStartConnection();
+  	}
+  	else if(os_strstr(ModuleSettings.configured,"OK")){ //Network configured, let's connect to MQTT Broker
+		WIFI_Connect(ModuleSettings.ssid, ModuleSettings.sta_pwd, MQTTwifiConnectCb); //mqttStartConnection();
   		mqttStartConnection();
-  	else
+  	}
+  	else //Nothing configured, just starting for first cfg
   		InitWS();
 }
 

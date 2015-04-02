@@ -79,27 +79,22 @@ window.onload=function(e) {
 </div>
 <p>
 <b><h4>
-Powered by:<br>
+Desenvolvido por:<br>
 Anderson Ignacio da Silva<br>
-Guilherme Eduardo Cavalheiro<br>
 Armando Leopoldo Keller<br>
+Guilherme Eduardo Cavalheiro<br>
 </h4>
+<div id="creators"></div>
 </b>
-Current WiFi mode: %WiFiMode%
-</p>
-<p>
-Note: %WiFiapwarn%
 </p>
 <form name="wifiform" action="connect.cgi" method="post">
 <p>
-To connect to a WiFi network, please select one of the detected networks...<br>
-<div id="aps">Scanning...</div>
+Para conectar selecione uma das redes listadas abaixo:<br>
+<div id="aps">Procurando redes...</div>
 <br>
-WiFi password, if applicable: <br />
+Senha Wi-fi, se aplicavel: <br />
 <input type="password" name="passwd" val="%WiFiPasswd%"> <br />
 <br>
-MQTT Broker IP: <br />
-<input type="text" name="mqtthost" val="%MQTTHostIP%"> <br><br>
 <input type="submit" name="connect" value="Connect!" style="width:100px; height:50px;">
 </p>
 </div>

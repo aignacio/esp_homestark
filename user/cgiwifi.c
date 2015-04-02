@@ -198,8 +198,8 @@ int ICACHE_FLASH_ATTR cgiWiFiConnect(HttpdConnData *connData) {
 
 	os_sprintf(ModuleSettings.ssid, "%s", essid);
 	os_sprintf(ModuleSettings.sta_pwd, "%s", passwd);
-	os_sprintf(ModuleSettings.mqtt_host, "%s", mqtt_host_ip);
-	os_sprintf(ModuleSettings.configured, "%s", "OK");
+	//os_sprintf(ModuleSettings.mqtt_host, "%s", mqtt_host_ip);
+	os_sprintf(ModuleSettings.configured, "%s", "NO");
 	
 	WriteFlash();
 	system_restart();

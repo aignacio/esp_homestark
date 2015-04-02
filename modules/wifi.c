@@ -83,7 +83,7 @@ static void ICACHE_FLASH_ATTR wifi_check_ip(void *arg)
 
 void timeout_timerWifiCb(){
 	if(enableTimeoutTimerAP){
-		INFO("\n[Timeout]Try number:%d",TRY_AP-TryConnectAP);
+		INFO("\n\r[Timeout]Try number:%d\n\n\r",TRY_AP-TryConnectAP);
 		TryConnectAP--;
 		if(!TryConnectAP)
 			ResetToAP();
@@ -94,7 +94,7 @@ void timeout_timerWifiCb(){
 }
 
 void EnableTimeout(){
-	INFO("\n\n\rTimeout Timer Enabled!");
+	INFO("\n\n\rTimeout Timer Enabled!\n\r");
 	os_timer_disarm(&timeout_timer_ap);
     os_timer_setfn(&timeout_timer_ap, (os_timer_func_t *)timeout_timerWifiCb, NULL);
     os_timer_arm(&timeout_timer_ap, TIME_TIMEOUT_AP, 0);
@@ -105,7 +105,7 @@ void ICACHE_FLASH_ATTR WIFI_Connect(uint8_t* ssid, uint8_t* pass, WifiCallback c
 {
 	struct station_config stationConf;
 
-	INFO("\n\rWIFI_INIT - MQTT\r\n");
+	INFO("\n\rTry to connect to AP\n\r");
 	wifi_set_opmode(STATION_MODE);
 	wifi_station_set_auto_connect(FALSE);
 	wifiCb = cb;

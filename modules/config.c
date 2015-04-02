@@ -108,12 +108,6 @@ CFG_Load()
 
 }
 
-
-
-
-
-
-
 void ICACHE_FLASH_ATTR WriteFlash() {
 	INFO("\n\r[WRITE] Data that will be writed in flash:");
 
