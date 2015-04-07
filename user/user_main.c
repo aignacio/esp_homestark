@@ -31,6 +31,7 @@
 #include "ip_addr.h"
 #include "espconn.h"
 #include "user_interface.h"
+#include "driver/pwm.h"
 
 #define INFO 			os_printf
 #define PORT_WS 		80
@@ -41,8 +42,14 @@
 
 #define TOPIC_MASTER	"/lights/%08X/dimmer/"
 #define TOPIC_STATUS	"/lights/%08X/current/"
+#define TOPIC_RGB_LIGHT	"/lights/%08X/RGB/"
  
-#define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
+
+#define LIGHT_RED       0
+#define LIGHT_GREEN     1
+#define LIGHT_BLUE      2
+
+//#define LED_1(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(4), x) 
 #define LED_2(x)	GPIO_OUTPUT_SET(GPIO_ID_PIN(5), x) 
 
 
@@ -80,6 +87,8 @@ typedef enum states
 states_buffer serial_s = FIRST_IDT;
 uint8 buffer_current[4],i = 0;
 
+
+LOCAL struct pwm_param pwm_rgb;
 /* Global */
 
 void MQTTwifiConnectCb(uint8_t status) {
@@ -104,17 +113,21 @@ void mqttConnectedCb(uint32_t *args) {
 	MQTT_Client* client = (MQTT_Client*)args;
 	INFO("MQTT: Connected\r\n");
 
-	uint8_t topic_1[64],topic_2[64];
+	uint8_t topic_1[64],topic_2[64],topic_3[64];
 
 	os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
 	os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
-		
+	os_sprintf(topic_3, TOPIC_RGB_LIGHT, system_get_chip_id());
+	
+
 	MQTT_Subscribe(client, topic_1, 0);
-	MQTT_Subscribe(client, topic_2, 1);
+	MQTT_Subscribe(client, topic_2, 0);
+	MQTT_Subscribe(client, topic_3, 0);
 	//MQTT_Subscribe(client, "/light/config", 2);
 
-	MQTT_Publish(client, topic_1, "50", sizeof("50"), 0, 0);
-	MQTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
+	MQTT_Publish(client, topic_3, "127127127", sizeof("127127127"), 0, 0);
+	//QTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
+    //MQTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
 
 	// MQTT_Publish(client, "/light/current", "0.755mA", 7, 0, 0);
 	// MQTT_Publish(client, "/light/dimmer", "50", 2, 1, 0);
@@ -145,9 +158,17 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
 
 	INFO("Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
 	INFO("@%s@",dataBuf);
+
+	if(os_strstr(topicBuf,"RGB"))
+	{
+		uint8_t PWM_RED =   (*(dataBuf)-0x30)*100+(*(dataBuf+1)-0x30)*10+(*(dataBuf+2)-0x30),
+				PWM_GREEN = (*(dataBuf+3)-0x30)*100+(*(dataBuf+4)-0x30)*10+(*(dataBuf+5)-0x30),
+				PWM_BLUE =  (*(dataBuf+6)-0x30)*100+(*(dataBuf+7)-0x30)*10+(*(dataBuf+8)-0x30);		 
+		RGBSetColor(PWM_RED,PWM_GREEN,PWM_BLUE);
+	}
 	os_free(topicBuf);
 	os_free(dataBuf);
-}
+}	
 
 void mqttStartConnection() {
 	//CFG_Load();
@@ -343,7 +364,7 @@ void ResetToAP(){
 }
 
 void ConfigureGPIO() {
-	PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4);
+	//PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO4_U, FUNC_GPIO4);
 	PIN_FUNC_SELECT(PERIPHS_IO_MUX_GPIO5_U, FUNC_GPIO5);
 
 	//Setting interrupt in pin GPIO13 - Button Reset AP
@@ -363,7 +384,7 @@ void ConfigureGPIO() {
 
 void BlinkStatusCB() {
 	if(os_strstr(ModuleSettings.configured,"OK")) {
-		LED_1(1);
+		//LED_1(1);
 		LED_2(1);
 		// if(blinkS){
 		// 	LED_1(1);
@@ -378,12 +399,12 @@ void BlinkStatusCB() {
 	}
 	else
 		if(blinkS){
-			LED_1(1);
+			//LED_1(1);
 			LED_2(0);
 			blinkS = false;
 		}
 		else{
-			LED_1(0);
+			//LED_1(0);
 			LED_2(1);
 			blinkS = true;
 		}
@@ -392,8 +413,7 @@ void BlinkStatusCB() {
 	os_timer_arm(&StatusTimer, 500, 0);
 }
 
-void SendMQTT()
-{
+void SendMQTT() {
 
   uint8_t topic_1[64],topic_2[64];
 
@@ -405,8 +425,7 @@ void SendMQTT()
   serial_s = FIRST_IDT;
 }
 
-void RecChar(uint8 CharBuffer)
-{
+void RecChar(uint8 CharBuffer) {
   switch(serial_s)
   {
     case FIRST_IDT:
@@ -429,8 +448,7 @@ void RecChar(uint8 CharBuffer)
 }
 
 LOCAL void ICACHE_FLASH_ATTR
-udpserver_recv(void *arg, char *data, unsigned short length)
-{
+udpserver_recv(void *arg, char *data, unsigned short length) {
 	uint8_t i=0, j=0, ip_broker[15];
 
 	if(*(data+0) == 'B' && 
@@ -457,9 +475,8 @@ udpserver_recv(void *arg, char *data, unsigned short length)
 }
 
 void ICACHE_FLASH_ATTR
-udp_init(void)
-{
-    // allocate memory for the control block
+udp_init(void) {    // allocate memory for the control block
+    
     pUdpServer = (struct espconn *)os_zalloc(sizeof(struct espconn));
 
     // fill memory with 0 bytes
@@ -488,6 +505,39 @@ udp_init(void)
     // 	INFO("\n\nProblem to create udp server!");
 }
 
+void RGBStripInit(){
+	pwm_rgb.freq = 2000;
+	pwm_rgb.duty[LIGHT_RED] = 127;
+	pwm_rgb.duty[LIGHT_GREEN] = 127;
+	pwm_rgb.duty[LIGHT_BLUE] = 127;
+	pwm_init(pwm_rgb.freq, pwm_rgb.duty);
+	pwm_start();
+
+	// uint8_t pwm_1=0,pwm_2=255,pwm_3=0,teste;
+	// for(teste;teste<255;teste++)
+	// {
+	// 	pwm_1++;
+	// 	pwm_2--;
+	// 	pwm_3++;
+	// 	pwm_set_duty(pwm_1, LIGHT_RED);
+	// 	pwm_set_duty(pwm_2, LIGHT_GREEN);
+	// 	pwm_set_duty(pwm_3, LIGHT_BLUE);
+	// 	pwm_start();	
+	// 	os_delay_us(100000);
+	// }
+}
+
+void RGBSetColor(uint8_t RED_L,uint8_t GREEN_L,uint8_t BLUE_L) {
+	pwm_set_duty(RED_L, LIGHT_RED);
+	pwm_set_duty(GREEN_L, LIGHT_GREEN);
+	pwm_set_duty(BLUE_L, LIGHT_BLUE);
+	pwm_start();
+	INFO("\n\n\r[RGB Leds Color]:\n\r");
+	INFO("RED=%d\n\r",RED_L);
+	INFO("GREEN=%d\n\r",GREEN_L);
+	INFO("BLUE=%d\n\r",BLUE_L);
+}
+
 void user_init(void) {
 	uart_init(BIT_RATE_115200,BIT_RATE_115200);//stdoutInit();
 
@@ -498,6 +548,8 @@ void user_init(void) {
   	RestoreFlash();
   	SetAP(false);
  	
+ 	RGBStripInit();
+
   	os_timer_disarm(&StatusTimer);
 	os_timer_setfn(&StatusTimer, BlinkStatusCB, NULL);
 	os_timer_arm(&StatusTimer, 500, 0);
