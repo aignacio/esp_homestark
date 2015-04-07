@@ -6,10 +6,11 @@ ESP8266 - Firmware
 This is fork mixed of [esp_mqtt](https://github.com/tuanpmt/esp_mqtt) and [esphttpd](http://git.spritesserver.nl/esphttpd.git/). 
 The library for compressing the files is a submodule then you need to add with:
   
-    cd esp_homestark
+    cd esp_homestark/lib
     git submodule init
     git submodule update
 
+<b>if you have problems with double type definition, comment "#include <stdint.h>" in heatshrink_decoder.c.</b>
 When you program the ESP8266, you need to connect to the module and then access his [ip address](192.168.4.1),
 when you open the page, the wi-fi ap's will be listed to you connect. After connected, insert in specific box of HTML's webpage, the <b>BROKER IP</b> of MQTT Network.
 
