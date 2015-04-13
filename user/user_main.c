@@ -40,8 +40,13 @@
 #define FW_VERSION		"[Device Homestark - v1.0 2015]"
 #define CONFIG_UDP_PORT 8080
 
-#define TOPIC_MASTER	"/lights/%08X/dimmer/"
-#define TOPIC_STATUS	"/lights/%08X/current/"
+// 0 - dimmer
+// 1 - interruptor
+// 2 - tomada
+
+#define TYPE_DEVICE 	"0"
+#define TOPIC_MASTER	"/homestark/config/%08X/"
+#define TOPIC_CONNECTED	"/homestark/%s/modulos/%s/#"
 #define TOPIC_RGB_LIGHT	"/lights/%08X/RGB/"
  
 
@@ -115,17 +120,28 @@ void mqttConnectedCb(uint32_t *args) {
 
 	uint8_t topic_1[64],topic_2[64],topic_3[64];
 
-	os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
-	os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
-	os_sprintf(topic_3, TOPIC_RGB_LIGHT, system_get_chip_id());
+	if(os_strstr(ModuleSettings.configured,"MOK"))
+	{
+		INFO("\n\rModule allready configured:%s",ModuleSettings.configured);
+		INFO("\n\rReceived client id:%s | module id:%s \n\r",ModuleSettings.homestark_client_id,ModuleSettings.homestark_mod_id);
+		
+		os_sprintf(topic_1, TOPIC_CONNECTED, ModuleSettings.homestark_client_id,ModuleSettings.homestark_mod_id);
+		MQTT_Subscribe(client, topic_1, 0);
+	}
+	else
+	{
+		os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
+		os_sprintf(topic_2, TOPIC_RGB_LIGHT, system_get_chip_id());
+		//os_sprintf(topic_3, TOPIC_STATUS, system_get_chip_id());	
+
+		MQTT_Subscribe(client, topic_1, 0);
+		MQTT_Subscribe(client, topic_2, 0);
+		//MQTT_Subscribe(client, "/light/config", 2);
+
+		MQTT_Publish(client, topic_1, TYPE_DEVICE, sizeof(TYPE_DEVICE), 0, 0);
+	}
+
 	
-
-	MQTT_Subscribe(client, topic_1, 0);
-	MQTT_Subscribe(client, topic_2, 0);
-	MQTT_Subscribe(client, topic_3, 0);
-	//MQTT_Subscribe(client, "/light/config", 2);
-
-	MQTT_Publish(client, topic_3, "127127127", sizeof("127127127"), 0, 0);
 	//QTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
     //MQTT_Publish(client, topic_2, "0.755mA", sizeof("0.755mA"), 1, 0);
 
@@ -159,6 +175,7 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
 	INFO("Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
 	INFO("@%s@",dataBuf);
 
+	//If we receive in /lights/CHIP_ID/RGB/ - xxxXXXxxx (RGB - each 0 to 255)
 	if(os_strstr(topicBuf,"RGB"))
 	{
 		uint8_t PWM_RED =   (*(dataBuf)-0x30)*100+(*(dataBuf+1)-0x30)*10+(*(dataBuf+2)-0x30),
@@ -166,6 +183,31 @@ void mqttDataCb(uint32_t *args, const char* topic, uint32_t topic_len, const cha
 				PWM_BLUE =  (*(dataBuf+6)-0x30)*100+(*(dataBuf+7)-0x30)*10+(*(dataBuf+8)-0x30);		 
 		RGBSetColor(PWM_RED,PWM_GREEN,PWM_BLUE);
 	}
+
+
+	//Will receive {XXXX(Client ID),XXXX(Mod ID)}
+	if(os_strstr(topicBuf,"/homestark/config") && os_strstr(dataBuf,"{"))
+	{
+		uint8_t mod_d[5],client_d[5],i;
+
+		for(i=0;i<4;i++)
+		{
+			client_d[i] = *(dataBuf+i+1);
+			mod_d[i] = *(dataBuf+i+6);
+		}
+		
+		client_d[4]  = '\0';
+		mod_d[4]  = '\0';
+		INFO("\n\rReceived client id:%s | module id:%s \n\r",client_d,mod_d);
+		
+		os_sprintf(ModuleSettings.homestark_client_id, "%s", client_d);
+		os_sprintf(ModuleSettings.homestark_mod_id, "%s", mod_d);
+		os_sprintf(ModuleSettings.configured, "%s", "MOK");
+		WriteFlash();
+		INFO("\n\n\n\rReceived parameters from CUBIEBOARD, now let's restart with standard configuration\n\r");
+		system_restart();
+	}
+
 	os_free(topicBuf);
 	os_free(dataBuf);
 }	
@@ -418,7 +460,7 @@ void SendMQTT() {
   uint8_t topic_1[64],topic_2[64];
 
   os_sprintf(topic_1, TOPIC_MASTER, system_get_chip_id());
-  os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
+  //os_sprintf(topic_2, TOPIC_STATUS, system_get_chip_id());
 
   i = 0;
   MQTT_Publish(&mqttClient, topic_2, buffer_current, sizeof(buffer_current), 1, 0);
@@ -557,7 +599,7 @@ void user_init(void) {
   	if(os_strstr(ModuleSettings.configured,"NO")){ //Almost configured, now we connect to wifi and wait for broadcast UDP
   		WIFI_Connect(ModuleSettings.ssid, ModuleSettings.sta_pwd, wifiConnectCb); //mqttStartConnection();
   	}
-  	else if(os_strstr(ModuleSettings.configured,"OK")){ //Network configured, let's connect to MQTT Broker
+  	else if(os_strstr(ModuleSettings.configured,"OK") || os_strstr(ModuleSettings.configured,"MOK")){ //Network configured, let's connect to MQTT Broker
 		WIFI_Connect(ModuleSettings.ssid, ModuleSettings.sta_pwd, MQTTwifiConnectCb); //mqttStartConnection();
   		mqttStartConnection();
   	}

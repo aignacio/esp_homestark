@@ -119,8 +119,10 @@ void ICACHE_FLASH_ATTR WriteFlash() {
 		   * mqtt_user_s = ModuleSettings.mqtt_user,
 		   * mqtt_pass_s = ModuleSettings.mqtt_pass,
 		   * mqtt_kp_s = ModuleSettings.mqtt_keepalive,
-		   * mqtt_security_s = ModuleSettings.security;
-	
+		   * mqtt_security_s = ModuleSettings.security,
+		   * homestark_client_id = ModuleSettings.homestark_client_id,
+		   * homestark_mod_id = ModuleSettings.homestark_mod_id;
+
 	INFO("\n\rWi-fi Settings:");
 	INFO("\n\r\tSSID: %s",ssid_name);
 	INFO("\n\r\tPassword SSID: %s",pass_s);
@@ -167,7 +169,10 @@ void ICACHE_FLASH_ATTR ReadFlash() {
 		   * mqtt_user_s = ModuleSettings.mqtt_user,
 		   * mqtt_pass_s = ModuleSettings.mqtt_pass,
 		   * mqtt_kp_s = ModuleSettings.mqtt_keepalive,
-		   * mqtt_security_s = ModuleSettings.security;
+		   * mqtt_security_s = ModuleSettings.security,
+		   * homestark_client_id = ModuleSettings.homestark_client_id,
+		   * homestark_mod_id = ModuleSettings.homestark_mod_id;
+
 	
 	INFO("\n\rWi-fi Settings:");
 	INFO("\n\r\tSSID: %s",ssid_name);

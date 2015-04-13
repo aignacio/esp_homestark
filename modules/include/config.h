@@ -47,6 +47,8 @@ typedef struct{
 	uint8_t mqtt_user[32];
 	uint8_t mqtt_pass[32];
 	uint32_t mqtt_keepalive;
+	uint8_t homestark_client_id[5];
+	uint8_t homestark_mod_id[5];
 	uint8_t security;
 } SYSCFG;
 
